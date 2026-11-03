@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>Mes exercices de musculation</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #181b22; --panel2: #1f232c; --line: #2a2f3a;
+    --text: #eef0f4; --muted: #9aa3b2; --accent: #ff7a3d; --ok: #3ecf8e; --warn: #f5b942;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { background: var(--bg); }
+  body {
+    margin: 0; color: var(--text); background: var(--bg);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  header {
+    position: sticky; top: 0; z-index: 5; background: rgba(15,17,21,.96);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+    padding: 14px 16px 10px; padding-top: calc(14px + env(safe-area-inset-top));
+  }
+  h1 { margin: 0 0 10px; font-size: 20px; letter-spacing: .2px; }
+  h1 small { color: var(--muted); font-weight: 500; font-size: 13px; margin-left: 6px; }
+  input[type=search] {
+    width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text); font-size: 16px; outline: none;
+  }
+  input[type=search]:focus { border-color: var(--accent); }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 10px 0 2px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: none; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--muted); font-size: 14px; cursor: pointer;
+  }
+  .chip[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: #1a0d05; font-weight: 600; }
+  main { padding: 14px 16px 40px; max-width: 760px; margin: 0 auto; }
+  .count { color: var(--muted); font-size: 13px; margin: 2px 0 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; margin-bottom: 14px; overflow: hidden; }
+  .top { display: flex; gap: 14px; padding: 12px; align-items: center; }
+  .gifbox {
+    flex: none; width: 132px; height: 132px; border-radius: 12px; background: #fff;
+    display: grid; place-items: center; overflow: hidden;
+  }
+  .gifbox img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .nogif { color: #666; font-size: 12px; text-align: center; padding: 8px; }
+  .info { min-width: 0; flex: 1; }
+  .info h2 { margin: 0 0 6px; font-size: 17px; line-height: 1.25; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .tag { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--panel2); color: var(--muted); border: 1px solid var(--line); }
+  .tag.grp { color: var(--accent); border-color: rgba(255,122,61,.4); }
+  .tag.verif { color: var(--warn); border-color: rgba(245,185,66,.45); }
+  .tag.ok { color: var(--ok); border-color: rgba(62,207,142,.4); }
+  .sub { color: var(--muted); font-size: 13px; }
+  details { border-top: 1px solid var(--line); }
+  summary { padding: 12px 14px; cursor: pointer; color: var(--muted); font-size: 14px; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "▾"; float: right; }
+  details[open] summary::after { content: "▴"; }
+  .body { padding: 0 14px 14px; }
+  .body ol { margin: 6px 0 12px 20px; padding: 0; }
+  .body li { margin-bottom: 6px; }
+  .note { background: var(--panel2); border-left: 3px solid var(--warn); padding: 8px 10px; border-radius: 6px; font-size: 14px; margin-bottom: 12px; }
+  .vars { display: flex; gap: 12px; flex-wrap: wrap; }
+  .var { width: 132px; font-size: 12px; color: var(--muted); }
+  .var .gifbox { width: 132px; height: 132px; margin-bottom: 4px; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; padding: 8px 16px 28px; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mes exercices <small id="total"></small></h1>
+  <input id="q" type="search" placeholder="Rechercher un exercice, un muscle…" autocomplete="off" enterkeyhint="search">
+  <div class="chips" id="chips"></div>
+</header>
+<main>
+  <div class="count" id="count"></div>
+  <div id="list"></div>
+</main>
+<footer>
+  Médias des exercices : © Gym visual — <a href="https://gymvisual.com/" target="_blank" rel="noopener">https://gymvisual.com/</a>
+</footer>
+<script src="data.js"></script>
+<script>
+(function () {
+  var data = window.EXERCICES || [];
+  var GIF = "../videos/";
+  var groups = ["Tous"].concat(Array.from(new Set(data.map(function (e) { return e.groupe; }))));
+  var state = { g: "Tous", q: "" };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function norm(s) { return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+
+  function gifBox(g, alt) {
+    if (!g) return '<div class="gifbox"><div class="nogif">Pas de GIF dans le dataset</div></div>';
+    return '<div class="gifbox"><img src="' + GIF + esc(g.gif) + '" alt="' + esc(alt) + '" loading="lazy" width="180" height="180"></div>';
+  }
+
+  function card(e) {
+    var p = e.principal;
+    var tags = '<span class="tag grp">' + esc(e.groupe) + '</span>';
+    if (p) tags += '<span class="tag">' + esc(p.equipement) + '</span>';
+    if (e.fiabilite === "verif") tags += '<span class="tag verif">GIF à confirmer</span>';
+    if (e.fiabilite === "aucun") tags += '<span class="tag verif">Sans GIF</span>';
+    var sub = e.semaines
+      ? 'Saisi sur ' + e.semaines + ' semaine' + (e.semaines > 1 ? 's' : '') + ' (S' + e.premiere + (e.derniere !== e.premiere ? ' à S' + e.derniere : '') + ')'
+      : 'Au carnet, sans charge saisie';
+
+    var details = "";
+    var inner = "";
+    if (e.note) inner += '<div class="note">' + esc(e.note) + '</div>';
+    if (e.etapes && e.etapes.length) {
+      inner += '<ol>' + e.etapes.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join("") + '</ol>';
+    }
+    if (p && p.nom) inner += '<div class="sub" style="margin-bottom:10px">GIF : ' + esc(p.nom) + (e.muscles_secondaires && e.muscles_secondaires.length ? ' · muscles secondaires : ' + esc(e.muscles_secondaires.join(", ")) : '') + '</div>';
+    if (e.variantes && e.variantes.length) {
+      inner += '<div class="vars">' + e.variantes.map(function (v) {
+        return '<div class="var">' + gifBox(v, v.nom) + esc(v.nom) + '</div>';
+      }).join("") + '</div>';
+    }
+    if (inner) details = '<details><summary>Instructions et variantes</summary><div class="body">' + inner + '</div></details>';
+
+    return '<article class="card"><div class="top">' + gifBox(p, e.nom) +
+      '<div class="info"><h2>' + esc(e.nom) + '</h2><div class="meta">' + tags + '</div>' +
+      '<div class="sub">' + esc(sub) + '</div></div></div>' + details + '</article>';
+  }
+
+  function render() {
+    var q = norm(state.q.trim());
+    var items = data.filter(function (e) {
+      if (state.g !== "Tous" && e.groupe !== state.g) return false;
+      if (!q) return true;
+      var hay = norm([e.nom, e.groupe, e.principal ? e.principal.nom + " " + e.principal.cible + " " + e.principal.equipement : ""].join(" "));
+      return hay.indexOf(q) !== -1;
+    });
+    $("count").textContent = items.length + " exercice" + (items.length > 1 ? "s" : "");
+    $("list").innerHTML = items.length ? items.map(card).join("") : '<div class="empty">Aucun exercice trouvé.</div>';
+  }
+
+  function renderChips() {
+    $("chips").innerHTML = groups.map(function (g) {
+      return '<button class="chip" type="button" aria-pressed="' + (g === state.g) + '" data-g="' + esc(g) + '">' + esc(g) + '</button>';
+    }).join("");
+  }
+
+  $("total").textContent = data.length + " au carnet";
+  $("chips").addEventListener("click", function (ev) {
+    var b = ev.target.closest(".chip");
+    if (!b) return;
+    state.g = b.getAttribute("data-g");
+    renderChips();
+    render();
+  });
+  $("q").addEventListener("input", function (ev) { state.q = ev.target.value; render(); });
+  renderChips();
+  render();
+})();
+</script>
+</body>
+</html>
